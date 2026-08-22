@@ -212,7 +212,7 @@ void setup() {
 
     if (!Bluefruit.begin()) {
         #ifdef DEBUG_BUILD
-            Serial.println("[ERROR] Bluefruit initialization failed");
+            Serial.println("[error] Bluefruit initialization failed");
         #endif
     }
 
@@ -255,23 +255,23 @@ void loop() {
             broadcastEvent(static_cast<uint8_t>(currentButtonIndex), ButtonEvent::PRESS);
 
             #ifdef DEBUG_BUILD
-                Serial.print("Reading: ");
+                Serial.print("[button] reading: ");
                 Serial.print(reading);
-                Serial.print(" Button: ");
+                Serial.print(" pressed: ");
                 Serial.println(BUTTONS[currentButtonIndex].name);
             #endif
         } else if (currentButtonIndex == -1) {
             broadcastEvent(BUTTON_NONE, ButtonEvent::RELEASE);
 
             #ifdef DEBUG_BUILD
-                Serial.println("IDLE");
+                Serial.println("[button] idle");
             #endif
         } else {
             // Broadcast RELEASE so the dash lets go immediately as it may still be repeating a PRESS.
             broadcastEvent(BUTTON_NONE, ButtonEvent::RELEASE);
 
             #ifdef DEBUG_BUILD
-                Serial.println("FAULT");
+                Serial.println("[button] fault — broadcasting release");
             #endif
         }
     } else {
@@ -281,7 +281,7 @@ void loop() {
             broadcastEvent(static_cast<uint8_t>(currentButtonIndex), ButtonEvent::HOLD);
 
             #ifdef DEBUG_BUILD
-                Serial.println("REPEAT");
+                Serial.println("[button] repeat");
             #endif
         }
     }
