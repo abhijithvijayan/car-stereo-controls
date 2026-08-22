@@ -14,6 +14,7 @@
 #pragma GCC diagnostic pop                          // restore what was saved at step 1
 
 #include <swc_protocol.h>
+#include "wake_on_press.h"
 
 using namespace swc;
 
@@ -152,27 +153,15 @@ void broadcastEvent(const uint8_t button, const ButtonEvent event) {
     lastBroadcastAt = millis();
 }
 
-volatile bool actionPending = false;
-
-void wake() {
-    actionPending = true;
-    resumeLoop();
-}
-
 void sleepUntilPress() {
-    actionPending = false;
-
     // Wake-on-press: R1 (1M) holds the node HIGH at rest; any button pulls it LOW
-    // through the ladder — that falling edge wakes the suspended loop. PIN_DRIVE
-    // watches the edge: as an input it carries no current through R2, so there is
-    // no drop across it — it sees the node voltage exactly. Attach only while
-    // suspended: sampleNode() drives PIN_DRIVE every awake pass, which would fake
-    // falling edges ~20/s, and pinMode(OUTPUT) on this core disconnects the pin's
-    // input buffer.
-    attachInterrupt(digitalPinToInterrupt(PIN_DRIVE), wake, FALLING);
+    // through the ladder. PIN_DRIVE watches the node (an input carries no current
+    // through R2, so no drop — it sees the node exactly). Armed only while sleeping:
+    // sampleNode() drives PIN_DRIVE every awake pass.
+    wake::arm();
 
-    // Never suspend with a button already down (node low) or a press that fired since the clear
-    if (digitalRead(PIN_DRIVE) == HIGH && !actionPending) {
+    // Never sleep with a button already down (node low): no falling level would follow
+    if (digitalRead(PIN_DRIVE) == HIGH) {
         #ifdef DEBUG_BUILD
             Serial.println("[sleep] idle timeout — advertising stopped, suspending");
             // println only queues into the CDC FIFO; TinyUSB transmits at 64 queued
@@ -186,11 +175,11 @@ void sleepUntilPress() {
         // so the library's "LED off" write inside Advertising.stop() actually lights
         // it solid for the whole sleep. Overwrite with the true off level.
         digitalWrite(LED_BLUE, HIGH);
-        suspendLoop(); // sleeps HERE until wake() runs
+        wake::waitForPress(); // sleeps HERE until the wake interrupt notifies
         Bluefruit.Advertising.start(0);
 
         #ifdef DEBUG_BUILD
-            Serial.println("[sleep] woke on press edge");
+            Serial.println("[sleep] woke on press");
         #endif
     } else {
         #ifdef DEBUG_BUILD
@@ -198,8 +187,7 @@ void sleepUntilPress() {
         #endif
     }
 
-    // Free the GPIOTE channel before loop() resumes sampling (which drives PIN_DRIVE)
-    detachInterrupt(digitalPinToInterrupt(PIN_DRIVE));
+    wake::disarm(); // before loop() resumes sampling (which drives PIN_DRIVE)
 }
 
 void setup() {
@@ -209,6 +197,8 @@ void setup() {
 
     pinMode(PIN_DRIVE, INPUT);
     pinMode(PIN_SENSE, INPUT);
+
+    wake::configure(PIN_DRIVE); // setup() runs on the loop task — the task configure() captures to wake
 
     analogReadResolution(12); // generate values between 0...4095
     // Sets the ADC's reference voltage to AR_VDD4 = reference is VDD/4. This makes the measurement proportional to VDD itself.
