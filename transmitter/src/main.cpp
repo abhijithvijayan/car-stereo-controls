@@ -32,6 +32,7 @@ uint8_t bleManufacturerData[PACKET_LENGTH] =
     BUTTON_NONE, // button code: 0-8, or 0xFF = idle/none
     ButtonEvent::RELEASE, // event: start in the released/idle state
     0x00, // sequence: +1 on every broadcast, for receiver dedupe
+    BATTERY_NOT_SAMPLED, // battery: cell voltage in 20mV units, refreshed at boot and on each wake
 };
 
 constexpr int PIN_DRIVE = D1;
@@ -135,6 +136,20 @@ void configureAdvertising() {
     Bluefruit.Advertising.addManufacturerData(bleManufacturerData, sizeof(bleManufacturerData));
 }
 
+// Cell voltage in BATTERY_UNIT_MILLIVOLTS units. The battery IS VDD (cell feeds
+// the 3V3 pin directly), so the chip measures its own supply. The ratiometric AR_VDD4
+// used for button sampling would read VDD-vs-VDD = full scale always, so the reading
+// swaps to the internal 0.6V reference (AR_INTERNAL, 3.6V full scale) and back.
+uint8_t batteryLevel = BATTERY_NOT_SAMPLED;
+
+void sampleBatteryLevel() {
+    analogReference(AR_INTERNAL); // 0.6V reference, 1/6 gain: full scale = 3.6V
+    const uint32_t counts = analogReadVDD();
+    analogReference(AR_VDD4); // restore the ratiometric button reference
+    const uint32_t millivolts = counts * 3600u / 4095u;
+    batteryLevel = static_cast<uint8_t>(millivolts / BATTERY_UNIT_MILLIVOLTS);
+}
+
 uint32_t lastBroadcastAt = 0;
 
 // Publish a new event to the live advert. We can't just mutate the buffer — Bluefruit copies
@@ -144,6 +159,7 @@ void broadcastEvent(const uint8_t button, const ButtonEvent event) {
     bleManufacturerData[PacketIndex::BUTTON_DATA] = button;
     bleManufacturerData[PacketIndex::EVENT_DATA] = static_cast<uint8_t>(event);
     bleManufacturerData[PacketIndex::SEQUENCE_NUMBER]++; // intentional 255 -> 0 wrap
+    bleManufacturerData[PacketIndex::BATTERY_LEVEL] = batteryLevel;
 
     Bluefruit.Advertising.stop();
     Bluefruit.Advertising.clearData();
@@ -176,10 +192,12 @@ void sleepUntilPress() {
         // it solid for the whole sleep. Overwrite with the true off level.
         digitalWrite(LED_BLUE, HIGH);
         wake::waitForPress(); // sleeps HERE until the wake interrupt notifies
+        sampleBatteryLevel(); // at-rest voltage: radio still off, cell unloaded
         Bluefruit.Advertising.start(0);
 
         #ifdef DEBUG_BUILD
             Serial.println("[sleep] woke on press");
+            Serial.printf("[battery] %umV\n", static_cast<unsigned>(batteryLevel) * BATTERY_UNIT_MILLIVOLTS);
         #endif
     } else {
         #ifdef DEBUG_BUILD
@@ -209,6 +227,7 @@ void setup() {
     analogReference(AR_VDD4);
 
     computeButtonThresholds();
+    sampleBatteryLevel();
 
     if (!Bluefruit.begin()) {
         #ifdef DEBUG_BUILD
@@ -239,6 +258,7 @@ void setup() {
 
     #ifdef DEBUG_BUILD
         Serial.println("[boot] wheel unit ready — advertising");
+        Serial.printf("[battery] %umV\n", static_cast<unsigned>(batteryLevel) * BATTERY_UNIT_MILLIVOLTS);
     #endif
 }
 
@@ -267,11 +287,13 @@ void loop() {
                 Serial.println("[button] idle");
             #endif
         } else {
-            // Broadcast RELEASE so the dash lets go immediately as it may still be repeating a PRESS.
-            broadcastEvent(BUTTON_NONE, ButtonEvent::RELEASE);
+            // FAULT still makes the dash let go immediately (it may be repeating a PRESS):
+            // the receiver treats an unknown button as release. The distinct event lets it
+            // also surface the wiring fault to the user.
+            broadcastEvent(BUTTON_NONE, ButtonEvent::FAULT);
 
             #ifdef DEBUG_BUILD
-                Serial.println("[button] fault — broadcasting release");
+                Serial.println("[button] fault — broadcasting fault event");
             #endif
         }
     } else {

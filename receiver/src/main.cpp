@@ -81,8 +81,15 @@ class BLEScanCallback : public NimBLEScanCallbacks {
             const char *eventName =
                 event == PRESS   ? "PRESS"   :
                 event == HOLD    ? "HOLD"    :
-                event == RELEASE ? "RELEASE" : "?";
-            Serial.printf("[%s] RSSI %d button=%u event=%s seq=%u\n", device->getAddress().toString().c_str(), device->getRSSI(), button, eventName, sequence);
+                event == RELEASE ? "RELEASE" :
+                event == FAULT   ? "FAULT"   : "?";
+            const uint8_t batteryByte = packet[PacketIndex::BATTERY_LEVEL];
+            if (batteryByte == BATTERY_NOT_SAMPLED) {
+                Serial.printf("[%s] RSSI %d button=%u event=%s seq=%u batt=n/a\n", device->getAddress().toString().c_str(), device->getRSSI(), button, eventName, sequence);
+            } else {
+                Serial.printf("[%s] RSSI %d button=%u event=%s seq=%u batt=%umV\n", device->getAddress().toString().c_str(), device->getRSSI(), button, eventName, sequence,
+                              static_cast<unsigned>(batteryByte) * BATTERY_UNIT_MILLIVOLTS);
+            }
         #endif
     }
 };
@@ -154,7 +161,7 @@ void processButtonsPress(const uint32_t now) {
                 const uint8_t nextButton = pendingButton;
                 const uint8_t nextEvent = pendingEvent;
 
-                if (nextEvent != RELEASE && nextButton < BUTTON_COUNT) {
+                if ((nextEvent == PRESS || nextEvent == HOLD) && nextButton < BUTTON_COUNT) {
                     activateKeyCode(nextButton);
                     currentActiveButton = nextButton;
                     outputState = OUTPUT_ACTIVE;
@@ -176,13 +183,13 @@ void processButtonsPress(const uint32_t now) {
                 const uint8_t nextButton = pendingButton;
                 const uint8_t nextEvent = pendingEvent;
 
-                if (nextEvent == RELEASE || nextButton >= BUTTON_COUNT) {
+                if (nextEvent == RELEASE || nextEvent == FAULT || nextButton >= BUTTON_COUNT) {
                     releaseCodes();
                     currentActiveButton = BUTTON_NONE;
                     outputState = OUTPUT_IDLE;
 
                     #ifdef DEBUG_BUILD
-                        Serial.printf("[mux] release (wheel RELEASE)\n");
+                        Serial.printf("[mux] release (%s)\n", nextEvent == FAULT ? "wheel FAULT" : "wheel RELEASE");
                     #endif
                 } else if (nextButton != currentActiveButton) {
                     activateKeyCode(nextButton);
