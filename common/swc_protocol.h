@@ -84,16 +84,17 @@ namespace swc {
         uint8_t channel; // Y0...Y7
     };
 
+    // all 9 codes safe on one voltage axis, min gap 214 mV on the measured Pioneer divider (3.335 V / ~650 Ω).
     constexpr OutputCode OUTPUT_CODES[] = {
-        { VOICE, "VOICE (680Ω)", MUX_2, 0 },
-        { SRC_PUSH, "SRC_PUSH (3.3k)", MUX_1, 2 },
-        { SRC_UP, "SRC_UP (4.7k)", MUX_1, 3 },
-        { SRC_DOWN, "SRC_DOWN (6.8k)", MUX_1, 4 },
-        { VOL_UP, "VOL_UP (1k)", MUX_1, 0 },
-        { MUTE, "MUTE (10k)", MUX_1, 5 },
+        { VOICE, "VOICE (3.3k)", MUX_2, 0 },
+        { SRC_PUSH, "SRC_PUSH (220Ω)", MUX_1, 2 },
+        { SRC_UP, "SRC_UP (330Ω)", MUX_1, 3 },
+        { SRC_DOWN, "SRC_DOWN (470Ω)", MUX_1, 4 },
+        { VOL_UP, "VOL_UP (100Ω)", MUX_1, 0 },
+        { MUTE, "MUTE (6.8k)", MUX_1, 5 },
         { VOL_DOWN, "VOL_DOWN (2k)", MUX_1, 1 },
-        { ANSWER, "ANSWER (510Ω)", MUX_2, 1 },
-        { CALL_END, "CALL_END (330Ω)", MUX_2, 2 },
+        { ANSWER, "ANSWER (1k)", MUX_2, 1 },
+        { CALL_END, "CALL_END (680Ω)", MUX_2, 2 },
     };
 
     static_assert(BUTTON_COUNT == sizeof(OUTPUT_CODES) / sizeof(OUTPUT_CODES[0]), "BUTTONS AND OUTPUT MAPPING SHOULD MATCH");
