@@ -1,5 +1,5 @@
 /*
- * Dash unit — ESP32-C3 BLE scanner + SWC output stage.
+ *  Dash unit — ESP32-C3 BLE scanner + SWC output stage.
  */
 
 // Framework headers aren't -Wconversion clean; silence their warnings so the flag
@@ -12,6 +12,7 @@
 #pragma GCC diagnostic pop                          // restore what was saved at step 1
 
 #include <swc_protocol.h>
+#include <rotary_encoder.h>
 
 using namespace swc;
 
@@ -25,9 +26,15 @@ constexpr uint8_t PIN_MUX_S1 = 1;
 constexpr uint8_t PIN_MUX_S2 = 3;
 constexpr uint8_t PIN_MUX_1_ENABLE = 4;
 constexpr uint8_t PIN_MUX_2_ENABLE = 5;
-constexpr uint8_t PIN_ENCODER_A = 8;
-constexpr uint8_t PIN_ENCODER_B = 10;
-constexpr uint8_t PIN_ENCODER_PUSH = 9;
+
+constexpr uint8_t PIN_ENCODER_A = 9;
+constexpr uint8_t PIN_ENCODER_B = 8;
+constexpr uint8_t PIN_ENCODER_PUSH = 10;
+
+// push contact must be edge-free this long before a press-down edge counts
+constexpr uint32_t PUSH_QUIET_MS = 30;
+
+RotaryEncoder encoder(PIN_ENCODER_A, PIN_ENCODER_B, EncoderStepMode::FULL_STEP);
 
 volatile uint8_t pendingButton = BUTTON_NONE;
 volatile uint8_t pendingEvent = RELEASE;
@@ -133,8 +140,7 @@ void setup() {
     digitalWrite(PIN_MUX_S2, LOW);
 
     // the encoder's common pin is wired to GND, so its contacts pull lines down; the internal ~45 k pull-ups give the idle-HIGH level
-    pinMode(PIN_ENCODER_A, INPUT_PULLUP);
-    pinMode(PIN_ENCODER_B, INPUT_PULLUP);
+    encoder.begin();
     pinMode(PIN_ENCODER_PUSH, INPUT_PULLUP);
 
     #ifdef DEBUG_BUILD
@@ -149,6 +155,62 @@ void setup() {
     scan->setWindow(100); // window == interval -> radio listening 100% of the time
     scan->setDuplicateFilter(false); // deliver EVERY advertisement, even from known devices
     scan->start(0, false); // 0 = scan forever
+}
+
+constexpr uint8_t TAP_QUEUE_SIZE = 10;
+constexpr uint32_t TAP_ON_MS = 50;
+constexpr uint32_t TAP_GAP_MS = 50;
+
+uint8_t tapQueue[TAP_QUEUE_SIZE];
+
+uint8_t tapHead = 0;
+uint8_t tapCount = 0;
+
+void enqueueTap(const uint8_t button) {
+    if (tapCount >= TAP_QUEUE_SIZE) {
+        #ifdef DEBUG_BUILD
+            Serial.printf("[queue] FULL — dropped %s\n", OUTPUT_CODES[button].name);
+        #endif
+
+        return;
+    }
+
+    tapQueue[(tapHead + tapCount) % TAP_QUEUE_SIZE] = button;
+    tapCount += 1;
+
+    #ifdef DEBUG_BUILD
+        Serial.printf("[queue] +%s (depth %u)\n", OUTPUT_CODES[button].name, tapCount);
+    #endif
+}
+
+void pollEncoder(const uint32_t now) {
+    const int8_t step = encoder.sampleStep();
+    if (step > 0) {
+        enqueueTap(VOL_UP);
+    } else if (step < 0) {
+        enqueueTap(VOL_DOWN);
+    }
+
+    static bool previous = digitalRead(PIN_ENCODER_PUSH) == LOW; // poll first on boot to get the actual state in case user is pressing on boot
+    static uint32_t lastPressAt = 0;
+
+    const bool current = digitalRead(PIN_ENCODER_PUSH) == LOW;  // pull-up: LOW = pressed
+    if (current != previous) {
+        // mute if the line was quiet beforehand
+        const bool quietLongEnough = now - lastPressAt >= PUSH_QUIET_MS;
+        if (current && quietLongEnough) {
+            enqueueTap(MUTE);
+        }
+
+        #ifdef DEBUG_BUILD
+            if (current && !quietLongEnough) {
+                Serial.printf("[enc] push down-edge rejected — line moved %ums ago\n", now - lastPressAt);
+            }
+        #endif
+
+        previous = current;
+        lastPressAt = now;
+    }
 }
 
 void processButtonsPress(const uint32_t now) {
@@ -222,5 +284,6 @@ void loop() {
     const uint32_t now = millis();
 
     processButtonsPress(now);
+    pollEncoder(now);
     delay(LOOP_YIELD_MS); // yield to the BLE + idle tasks (single core)
 }
