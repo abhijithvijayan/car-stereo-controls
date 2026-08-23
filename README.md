@@ -28,3 +28,12 @@ Each subproject is a self-contained PlatformIO project — open the subdirectory
 cd transmitter && pio run    # or: pio run -t upload
 cd receiver     && pio run
 ```
+
+## Third-party code
+
+- `receiver/src/rotary_encoder.{h,cpp}` — quadrature state tables derived from
+  [Ben Buxton's rotary library](https://github.com/buxtronix/arduino/tree/master/libraries/Rotary),
+  Copyright 2011 Ben Buxton, **GPL v3**. These two files remain under GPL v3 (it
+  cannot be relicensed to MIT); fine for private/personal use, but they carry
+  GPL terms if this repo is ever distributed. Everything else is MIT — see
+  [LICENCE](LICENCE).
