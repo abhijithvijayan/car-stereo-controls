@@ -1,4 +1,4 @@
-# car-stereo-controls
+# wireless-steering-wheel-controls
 
 > ⚠️ Work in progress
 
