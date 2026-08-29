@@ -115,11 +115,57 @@ the two sides have different pull-ups (5.1 k vs ~650 Ω) — the wheel's
 16.46 kΩ top value would compress to unusably small voltage steps on a 650 Ω
 divider.
 
-## Third-party code
+## Third-party code & assets
+
+Everything not listed below is original work under [MIT](LICENCE).
+
+### Code
 
 - `receiver/src/rotary_encoder.{h,cpp}` — quadrature state tables derived from
   [Ben Buxton's rotary library](https://github.com/buxtronix/arduino/tree/master/libraries/Rotary),
   Copyright 2011 Ben Buxton, **GPL v3**. These two files remain under GPL v3 (it
   cannot be relicensed to MIT); fine for private/personal use, but they carry
-  GPL terms if this repo is ever distributed. Everything else is MIT — see
-  [LICENCE](LICENCE).
+  GPL terms if this repo is ever distributed.
+
+### Hardware / CAD
+
+- `circuit/custom/Seeed_Studio_XIAO_Series.kicad_sym` and
+  `circuit/custom/XIAO-nRF52840-DIP.kicad_mod` — KiCad schematic symbol and
+  footprint from Seeed Studio's official
+  [XIAO KiCad libraries](https://wiki.seeedstudio.com/XIAO_BLE/#seeed-studio-xiao-nrf52840)
+  ([symbols](https://files.seeedstudio.com/wiki/XIAO-KiCad-Library/XIAO_Series_SCH_Symbols.zip),
+  [footprints](https://files.seeedstudio.com/wiki/XIAO-KiCad-Library/New_XIAO_Series_Footprints.zip)),
+  © Seeed Studio, [CC BY-SA 4.0](https://wiki.seeedstudio.com/License/)
+  (Seeed wiki resources license). The footprint has local modifications;
+  as CC BY-SA derivatives, these two files remain CC BY-SA 4.0.
+
+- `circuit/custom/ESP32-C3_SUPERMINI_TH.kicad_sym`,
+  `circuit/custom/MODULE_ESP32-C3_SUPERMINI_TH.kicad_mod`, and
+  `circuit/custom/ESP32-C3_SUPERMINI_TH.step` — symbol, footprint, and 3D model
+  from [SnapMagic Search (SnapEDA)](https://www.snapeda.com/parts/ESP32-C3%20SuperMini_TH/Espressif%20Systems/view-part/),
+  [CC BY-SA 4.0 with Design Exception 1.0](https://support.snapeda.com/en/articles/2957814-what-is-the-license-for-symbols-and-footprints)
+  (the exception lets designs and boards built with these files be licensed
+  freely; the files themselves remain CC BY-SA with attribution).
+
+- `circuit/custom/XIAO-nRF52840 v15.step` — 3D board model from the GrabCAD
+  Community Library:
+  [Seeed Studio XIAO nRF52840 (Sense)](https://grabcad.com/library/seeed-studio-xiao-nrf52840-sense-1).
+  ⚠️ GrabCAD community models are licensed for **private use**; public
+  redistribution requires the uploader's permission.
+
+- `3d models/battery_case.FCStd` and `3d models/Battery Enclosure - cr2450.stl`
+  — CR2450 battery holder: FreeCAD project created to modify, and the modified
+  STL exported from, the
+  [CRxxxx battery holder generator](https://cults3d.com/en/3d-model/tool/crxxxx-battery-holder-generator)
+  output by **shusy** on Cults3D, **CC BY-NC** — both files remain CC BY-NC.
+  `3d models/transmitter_case.FCStd` is original work but embeds the modified
+  holder, so it is not usable commercially as a whole.
+
+### Tools
+
+Designed with [KiCad](https://www.kicad.org/) (PCB) and
+[FreeCAD](https://www.freecad.org/) (enclosure); the PCB was brought into the
+FreeCAD enclosure project with
+[kicadStepUp](https://github.com/easyw/kicadStepUpMod/) (easyw, AGPL-3.0).
+Firmware built with [PlatformIO](https://platformio.org/). Tool licenses do
+not apply to this repo's content.
