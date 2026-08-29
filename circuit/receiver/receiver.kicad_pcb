@@ -1992,6 +1992,17 @@
 			(uuid "00555685-0994-4d58-9f51-1a73e1c88e52")
 		)
 		(embedded_fonts no)
+		(model "/Users/abhijithvijayan/personal/wireless-steering-wheel-controls/circuit/custom/ESP32-C3_SUPERMINI_TH.step"
+			(offset
+				(xyz 0 0 0)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz -90 -0 -0)
+			)
+		)
 	)
 	(footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
 		(layer "F.Cu")
