@@ -546,7 +546,7 @@
     "last_paths": {
       "idf": "",
       "netlist": "",
-      "plot": "build/",
+      "plot": "../build/",
       "specctra_dsn": "",
       "vrml": ""
     },
