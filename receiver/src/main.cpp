@@ -36,10 +36,10 @@ constexpr uint32_t PUSH_QUIET_MS = 30;
 
 RotaryEncoder encoder(PIN_ENCODER_A, PIN_ENCODER_B, EncoderStepMode::FULL_STEP);
 
-volatile uint8_t pendingButton = BUTTON_NONE;
-volatile uint8_t pendingEvent = RELEASE;
-volatile bool hasPendingAction = false;
-volatile uint32_t lastHeardAt = 0; // heartbeat for the timeout failsafe
+volatile uint8_t pendingWheelButton = BUTTON_NONE;
+volatile uint8_t pendingWheelEvent = RELEASE;
+volatile bool hasPendingWheelEvent = false;
+volatile uint32_t lastWheelHeardAt = 0; // heartbeat for the timeout failsafe
 
 enum OutputState : uint8_t {
     OUTPUT_IDLE,
@@ -62,8 +62,8 @@ class BLEScanCallback : public NimBLEScanCallbacks {
         }
 
         const uint32_t now = millis();
-        const uint32_t sinceLast = now - lastHeardAt;
-        lastHeardAt = now;
+        const uint32_t sinceLast = now - lastWheelHeardAt;
+        lastWheelHeardAt = now;
 
         const uint8_t button = packet[PacketIndex::BUTTON_DATA];
         const uint8_t event = packet[PacketIndex::EVENT_DATA];
@@ -80,9 +80,9 @@ class BLEScanCallback : public NimBLEScanCallbacks {
         initialized = true;
         lastSequence = sequence;
 
-        pendingButton = button;
-        pendingEvent = event;
-        hasPendingAction = true;
+        pendingWheelButton = button;
+        pendingWheelEvent = event;
+        hasPendingWheelEvent = true;
 
         #ifdef DEBUG_BUILD
             const char *eventName =
@@ -158,8 +158,8 @@ void setup() {
 }
 
 constexpr uint8_t TAP_QUEUE_SIZE = 10;
-constexpr uint32_t TAP_ON_MS = 50;
-constexpr uint32_t TAP_GAP_MS = 50;
+constexpr uint32_t TAP_HOLD_MS = 50;
+constexpr uint32_t TAP_SPACING_MS = 50;
 
 uint8_t tapQueue[TAP_QUEUE_SIZE];
 
@@ -216,12 +216,12 @@ void pollEncoder(const uint32_t now) {
 void processButtonsPress(const uint32_t now) {
     switch (outputState) {
         case OUTPUT_IDLE: {
-            if (hasPendingAction) {
-                hasPendingAction = false;
+            if (hasPendingWheelEvent) {
+                hasPendingWheelEvent = false;
 
                 // Take a snapshot to prevent volatile data getting overwritten by the NimBLE task mid processing
-                const uint8_t nextButton = pendingButton;
-                const uint8_t nextEvent = pendingEvent;
+                const uint8_t nextButton = pendingWheelButton;
+                const uint8_t nextEvent = pendingWheelEvent;
 
                 if ((nextEvent == PRESS || nextEvent == HOLD) && nextButton < BUTTON_COUNT) {
                     activateKeyCode(nextButton);
@@ -238,12 +238,12 @@ void processButtonsPress(const uint32_t now) {
         }
 
         case OUTPUT_ACTIVE: {
-            if (hasPendingAction) {
-                hasPendingAction = false;
+            if (hasPendingWheelEvent) {
+                hasPendingWheelEvent = false;
 
                 // Take a snapshot to prevent volatile data getting overwritten by the NimBLE task mid processing
-                const uint8_t nextButton = pendingButton;
-                const uint8_t nextEvent = pendingEvent;
+                const uint8_t nextButton = pendingWheelButton;
+                const uint8_t nextEvent = pendingWheelEvent;
 
                 if (nextEvent == RELEASE || nextEvent == FAULT || nextButton >= BUTTON_COUNT) {
                     releaseCodes();
@@ -261,7 +261,7 @@ void processButtonsPress(const uint32_t now) {
                         Serial.printf("[mux] switch to %s\n", OUTPUT_CODES[nextButton].name);
                     #endif
                 }
-            } else if (now - lastHeardAt > HEARTBEAT_TIMEOUT_MS) {
+            } else if (now - lastWheelHeardAt > HEARTBEAT_TIMEOUT_MS) {
                 releaseCodes();
                 currentActiveButton = BUTTON_NONE;
                 outputState = OUTPUT_IDLE;
