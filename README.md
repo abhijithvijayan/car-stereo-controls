@@ -77,8 +77,9 @@ pulses with 50 ms spacing between pulses.
 Asserting a button: two 74HC4051 analog multiplexers (shared S0–S2 select
 lines; per-mux active-low enables with 10 k pull-ups so both muxes are off
 until the firmware initializes) connect one of nine fixed resistors between a
-head-unit SWC wire and ground. Electrically this is identical to a wired OEM
-button press.
+head-unit SWC wire and ground. Each mux common reaches its SWC wire through a
+photoMOS solid-state relay (see [power-fail isolation](#power-fail-isolation)
+below). Electrically this is identical to a wired OEM button press.
 
 The head unit holds each SWC input at 3.335 V through an internal ~650 Ω
 pull-up and reads the divider voltage produced by the pressed button's
@@ -91,19 +92,20 @@ Installed codes:
 | Ref | Button    | Mux/channel | Resistor | Wire voltage |
 |-----|-----------|-------------|----------|--------------|
 | R1  | VOL_UP    | M1 / Y0     | 100 Ω    | 0.87 V |
-| R3  | SRC_PUSH  | M1 / Y2     | 220 Ω    | 1.16 V |
-| R4  | SRC_UP    | M1 / Y3     | 330 Ω    | 1.38 V |
-| R5  | SRC_DOWN  | M1 / Y4     | 470 Ω    | 1.60 V |
-| R9  | CALL_END  | M2 / Y2     | 680 Ω    | 1.85 V |
-| R8  | ANSWER    | M2 / Y1     | 1 k      | 2.11 V |
-| R2  | VOL_DOWN  | M1 / Y1     | 2 k      | 2.55 V |
-| R7  | VOICE     | M2 / Y0     | 3.3 k    | 2.80 V |
+| R2  | SRC_PUSH  | M1 / Y1     | 220 Ω    | 1.16 V |
+| R3  | SRC_UP    | M1 / Y2     | 330 Ω    | 1.38 V |
+| R4  | SRC_DOWN  | M1 / Y3     | 470 Ω    | 1.60 V |
+| R7  | CALL_END  | M2 / Y2     | 680 Ω    | 1.85 V |
+| R8  | VOICE     | M2 / Y1     | 1 k      | 2.11 V |
+| R5  | VOL_DOWN  | M1 / Y4     | 2 k      | 2.55 V |
+| R9  | ANSWER    | M2 / Y0     | 3.3 k    | 2.80 V |
 | R6  | MUTE      | M1 / Y5     | 6.8 k    | 3.05 V |
 | —   | idle      | —           | open     | 3.335 V |
 
-(M1 common → SWC wire 1, M2 common → SWC wire 2, shared ground. Support
-parts: R10/R11 = 10 k pull-ups on the mux enables, C1/C2 = 100 nF decoupling
-at each mux VCC.)
+(M1 common → SSR → SWC wire 1, M2 common → SSR → SWC wire 2, shared ground.
+Support parts: R10/R11 = 10 k pull-ups on the mux enables, C1/C2 = 100 nF
+decoupling at each mux VCC, U3/U5 = AQY212EH photoMOS relays with
+R12/R13 = 680 Ω LED resistors.)
 
 The nine values are chosen for voltage spacing on the head unit's divider —
 minimum ~215 mV between any two codes on the combined axis (placed on the
@@ -114,6 +116,40 @@ resistance code is only meaningful relative to the pull-up that reads it, and
 the two sides have different pull-ups (5.1 k vs ~650 Ω) — the wheel's
 16.46 kΩ top value would compress to unusably small voltage steps on a 650 Ω
 divider.
+
+### Power-fail isolation
+
+The receiver is powered from the head unit's own USB port, and the head unit
+can be on while the receiver is dead — during engine cranking (the head unit
+sheds its USB load for a few seconds) or with the cable unplugged. An
+unpowered 74HC4051 is not an open circuit: like most CMOS parts it has ESD
+protection diodes from every signal pin to VCC, so the head unit's 650 Ω
+pull-up back-feeds through the mux common into the dead 3.3 V rail. The SWC
+wires sag from 3.335 V to ~2.2 V — right at a learned code's window, with
+others swept through on the way — so a dead receiver used to press phantom
+buttons. No firmware can help, because none is running.
+
+As defense in depth, the button assignment accounts for this: the ~2.1 V slot
+nearest the back-feed voltage belongs to VOICE (a phantom there only pokes the
+voice assistant), while the phone-critical ANSWER sits at 2.80 V, far from
+every measured fault voltage.
+
+The fix is a normally-open photoMOS relay (Panasonic AQY212EH) in series
+between each mux common and its SWC wire. The relay's input side is an
+internal infrared LED fed from the raw USB 5 V rail through 680 Ω (~5.5 mA,
+inside the datasheet's recommended 5–10 mA band; still ≥4 mA above the 3 mA
+guaranteed trigger at the worst-case corner of USB's 4.4 V floor, max LED Vf,
+and resistor tolerance). The only coupling to the output MOSFETs is light:
+when USB power dies the LED goes dark and the outputs become a genuinely open
+circuit, so the wires float at the 3.335 V idle exactly as if nothing were
+connected. The LED resistors tap the 5 V node ahead of the module's regulator
+and bulk capacitance so the relays open before the 3.3 V rail can sag into
+the back-feed region.
+
+Cost of the extra series element: ~0.85 Ω on-resistance, which shifts the
+most sensitive code (VOL_UP) by ~3 mV and the gaps between codes by even
+less — re-running the head unit's learning mode after installation absorbs
+it entirely.
 
 ## Third-party code & assets
 

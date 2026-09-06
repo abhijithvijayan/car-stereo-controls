@@ -85,15 +85,19 @@ namespace swc {
     };
 
     // all 9 codes safe on one voltage axis, min gap 214 mV on the measured Pioneer divider (3.335 V / ~650 Ω).
+    // Channels match the PCB (schematic = source of truth): wire-1 resistors sit on
+    // Y0..Y5 in ascending value order (100/220/330/470/2k/6.8k).
     constexpr OutputCode OUTPUT_CODES[] = {
-        { VOICE, "VOICE (3.3k)", MUX_2, 0 },
-        { SRC_PUSH, "SRC_PUSH (220Ω)", MUX_1, 2 },
-        { SRC_UP, "SRC_UP (330Ω)", MUX_1, 3 },
-        { SRC_DOWN, "SRC_DOWN (470Ω)", MUX_1, 4 },
+        // VOICE holds the 2.11 V slot (nearest to the measured dead-board voltage);
+        // a phantom there only pokes the voice assistant. ANSWER sits far from it.
+        { VOICE, "VOICE (1k)", MUX_2, 1 },
+        { SRC_PUSH, "SRC_PUSH (220Ω)", MUX_1, 1 },
+        { SRC_UP, "SRC_UP (330Ω)", MUX_1, 2 },
+        { SRC_DOWN, "SRC_DOWN (470Ω)", MUX_1, 3 },
         { VOL_UP, "VOL_UP (100Ω)", MUX_1, 0 },
         { MUTE, "MUTE (6.8k)", MUX_1, 5 },
-        { VOL_DOWN, "VOL_DOWN (2k)", MUX_1, 1 },
-        { ANSWER, "ANSWER (1k)", MUX_2, 1 },
+        { VOL_DOWN, "VOL_DOWN (2k)", MUX_1, 4 },
+        { ANSWER, "ANSWER (3.3k)", MUX_2, 0 },
         { CALL_END, "CALL_END (680Ω)", MUX_2, 2 },
     };
 
